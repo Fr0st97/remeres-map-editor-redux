@@ -2,8 +2,10 @@ local Paths = dofile("module_paths.lua")
 local GroundCommon = Paths.load("ground_studio/common.lua")
 local PaletteDraft = dofile("palette_draft.lua")
 local PaletteRepository = dofile("palette_repository.lua")
+local XmlTarget = dofile("xml_target_helper.lua")
 
 local PalettePage = {}
+local SETTINGS_STORE = app.storage("palette_settings.json")
 
 local palette = {
     header = "#233246",
@@ -29,10 +31,11 @@ local PALETTE_SECTION_OPTIONS = {
 local function create_page(options)
     options = options or {}
     local session = options.session or {}
+    local settings = SETTINGS_STORE:load() or {}
     local dlg
 
     local state = {
-        target_path = PaletteRepository.resolve_target_path(""),
+        target_path = PaletteRepository.resolve_target_path(settings.target_path or ""),
         repository = nil,
         brush_filter = "",
         brush_items = {},
@@ -49,6 +52,12 @@ local function create_page(options)
     }
 
     local actions = {}
+
+    local function persist_settings()
+        SETTINGS_STORE:save({
+            target_path = state.target_path or "",
+        })
+    end
 
     local function sync_session_out()
         session.pageDirty = session.pageDirty or {}
@@ -464,6 +473,39 @@ local function create_page(options)
         finalize_save("overwrite")
     end
 
+    function actions.choose_target_path()
+        local chosen, err = XmlTarget.pick_xml_file("tilesets.xml", state.target_path, "Wybierz tilesets.xml")
+        if err then
+            app.alert({
+                title = "Nie mozna ustawic targetu",
+                text = err,
+                buttons = { "OK" },
+            })
+            return
+        end
+        if not chosen then
+            return
+        end
+
+        state.target_path = chosen
+        persist_settings()
+        refresh_repository()
+        sync_brushes()
+        sync_tilesets()
+        state.status_message = "Ustawiono nowy target tilesets.xml."
+        soft_refresh()
+    end
+
+    function actions.use_default_target_path()
+        state.target_path = PaletteRepository.resolve_target_path("")
+        persist_settings()
+        refresh_repository()
+        sync_brushes()
+        sync_tilesets()
+        state.status_message = "Przywrocono domyslny target tilesets.xml."
+        soft_refresh()
+    end
+
     refresh_repository()
     sync_brushes()
     sync_tilesets()
@@ -499,6 +541,7 @@ local function create_page(options)
     function page.onLeave(shared_session)
         session = shared_session or session
         sync_session_out()
+        persist_settings()
     end
 
     function page.render_into(dialog)
@@ -932,6 +975,28 @@ local function create_page(options)
                         text = save_hint_text(),
                         fgcolor = palette.muted,
                     })
+                    dlg:newrow()
+                    dlg:box({
+                        orient = "horizontal",
+                        expand = false,
+                    })
+                        dlg:button({
+                            text = "Zmien XML",
+                            bgcolor = palette.panel,
+                            fgcolor = palette.text,
+                            onclick = function()
+                                actions.choose_target_path()
+                            end,
+                        })
+                        dlg:button({
+                            text = "Domyslny XML",
+                            bgcolor = palette.panel,
+                            fgcolor = palette.text,
+                            onclick = function()
+                                actions.use_default_target_path()
+                            end,
+                        })
+                    dlg:endbox()
                 dlg:endpanel()
             dlg:endbox()
         dlg:endbox()

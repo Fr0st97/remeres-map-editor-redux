@@ -2,6 +2,8 @@
 #  Build outputs
 # ============================================================
 build/
+build-*/
+build_*/
 build.*/
 build-debug/
 build-release/
@@ -10,6 +12,7 @@ linux_build/
 build.log
 build_script.log
 build_output*.txt
+build_windows.bat
 
 # ============================================================
 #  CMake
@@ -127,4 +130,7 @@ compile_commands.json
 /assets
 /build-ninja-codex/vcpkg_installed
 /build-ninja-codex
+/creators-transfer/
+/.worktrees/
+/scripts/brush_studio/*_settings.json
 

@@ -36,6 +36,8 @@
 #include <wx/msgdlg.h>
 #include <wx/app.h>
 #include <wx/clipbrd.h>
+#include <wx/filedlg.h>
+#include <wx/filename.h>
 #include <fstream>
 #include <filesystem>
 #include <unordered_set>
@@ -340,6 +342,46 @@ namespace LuaAPI {
 			default:
 				return 0;
 		}
+	}
+
+	static sol::object chooseFile(sol::this_state ts, sol::object arg) {
+		sol::state_view lua(ts);
+
+		std::string title = "Select file";
+		std::string path;
+		std::string wildcard = "XML files (*.xml)|*.xml|All files (*.*)|*.*";
+
+		if (arg.is<sol::table>()) {
+			sol::table options = arg.as<sol::table>();
+			title = options.get_or(std::string("title"), title);
+			path = options.get_or(std::string("path"), std::string(""));
+			wildcard = options.get_or(std::string("wildcard"), wildcard);
+		} else if (arg.is<std::string>()) {
+			path = arg.as<std::string>();
+		}
+
+		wxFileName fileName{wxString(path)};
+		wxString defaultDir = fileName.GetPath();
+		wxString defaultFile = fileName.GetFullName();
+		if (defaultDir.IsEmpty()) {
+			defaultDir = wxString(FileSystem::GetDataDirectory().ToStdString());
+		}
+
+		wxWindow* parent = g_gui.root;
+		wxFileDialog dlg(
+			parent,
+			wxString(title),
+			defaultDir,
+			defaultFile,
+			wxString(wildcard),
+			wxFD_OPEN | wxFD_FILE_MUST_EXIST
+		);
+
+		if (dlg.ShowModal() != wxID_OK) {
+			return sol::make_object(lua, sol::nil);
+		}
+
+		return sol::make_object(lua, dlg.GetPath().ToStdString());
 	}
 
 	// Check if a map is currently open
@@ -803,6 +845,7 @@ namespace LuaAPI {
 
 		// Functions
 		app["alert"] = showAlert;
+		app["chooseFile"] = chooseFile;
 		app["hasMap"] = hasMap;
 		app["refresh"] = refresh;
 		app["setBrush"] = [](const std::string& name) {
